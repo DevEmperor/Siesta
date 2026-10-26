@@ -568,9 +568,19 @@ main {
 }
 
 .split-actions p {
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
   color: var(--muted);
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.split-actions .clock-text {
+  color: var(--text);
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------ search and filter */
@@ -860,11 +870,6 @@ main {
 }
 
 
-.fineprint {
-  margin: -10px 0 20px;
-  color: var(--faint);
-  font-size: 12px;
-}
 
 h2 {
   margin: 22px 0 10px;
@@ -1157,24 +1162,8 @@ select,
   color: var(--faint);
 }
 
-.range {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
 
-.range input {
-  width: 100%;
-  accent-color: var(--sleep);
-}
 
-.range output {
-  min-width: 60px;
-  text-align: right;
-  font-weight: 620;
-  font-variant-numeric: tabular-nums;
-}
 
 .about {
   color: var(--faint);

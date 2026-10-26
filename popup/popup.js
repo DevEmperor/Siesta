@@ -4,7 +4,6 @@ import {
   chipLabel,
   dayKey,
   formatAgo,
-  formatBytesMB,
   formatClock,
   formatMinutes,
   formatSpan,
@@ -380,7 +379,6 @@ function renderTabs() {
   // Loaded vs unloaded
   const asleep = S.tabs.filter((x) => x.discarded);
   const awake = S.tabs.length - asleep.length;
-  const freed = asleep.length * S.settings.mbPerTab;
   const bar = h("div", { class: "split-bar", role: "img", "aria-label": `${awake} geladen, ${asleep.length} entladen` });
   if (awake) bar.append(h("span", { class: "awake", style: `flex-grow:${awake}` }));
   if (asleep.length) bar.append(h("span", { class: "asleep", style: `flex-grow:${asleep.length}` }));
@@ -392,10 +390,7 @@ function renderTabs() {
     ),
     bar,
     h("div", { class: "split-actions" },
-      h("p", {
-        text: asleep.length ? `ca. ${formatBytesMB(freed)} RAM frei` : "Noch nichts entladen",
-        title: asleep.length ? `Schätzung mit ${S.settings.mbPerTab} MB je entladenem Tab` : null,
-      }),
+      nextUnload(),
       h("button", {
         type: "button",
         class: "btn",
@@ -444,6 +439,19 @@ function renderTabs() {
   }
   if (loaded.length) list.append(group("Geladen", loaded, t));
   if (unloaded.length) list.append(group("Entladen", unloaded, t));
+}
+
+// The tab whose timer runs out first, with a live countdown.
+function nextUnload() {
+  const next = S.tabs
+    .filter((x) => x.status.state === "counting")
+    .sort((a, b) => a.status.due - b.status.due)[0];
+  if (!next) return h("p", { text: "Gerade läuft kein Timer" });
+  const label = next.title || next.url;
+  return h("p", { title: label },
+    "Als Nächstes in ",
+    h("span", { class: "clock-text", "data-due": next.status.due, text: formatClock(next.status.due - now()) }),
+    ": ", label);
 }
 
 function group(title, tabs, t) {
@@ -558,7 +566,7 @@ function renderStats() {
   const max = Math.max(1, ...days.map((d) => d.auto + d.manual));
 
   const lead = asleep
-    ? h("p", { class: "lead", text: `${asleep} ${asleep === 1 ? "Tab ist" : "Tabs sind"} gerade entladen und ${asleep === 1 ? "hält" : "halten"} grob ${formatBytesMB(asleep * S.settings.mbPerTab)} Arbeitsspeicher frei.` })
+    ? h("p", { class: "lead", text: `${asleep} von ${S.tabs.length} Tabs ${asleep === 1 ? "ist" : "sind"} gerade entladen.` })
     : h("p", { class: "lead", text: "Gerade ist kein Tab entladen." });
 
   const tip = h("div", { class: "tip", hidden: true });
@@ -597,7 +605,6 @@ function renderStats() {
 
   put($("view-stats"),
     lead,
-    h("p", { class: "fineprint", text: `Schätzung mit ${S.settings.mbPerTab} MB je Tab. Firefox gibt Add-ons keine Speicherwerte einzelner Tabs preis; den Wert kannst du in den Einstellungen anpassen.` }),
     h("h2", { text: "Entladungen der letzten 7 Tage" }),
     h("div", { class: "chart" },
       h("div", { class: "chart-legend" },
@@ -742,10 +749,6 @@ function renderSettings() {
   };
   hostInput.addEventListener("keydown", (e) => e.key === "Enter" && addRule());
 
-  const range = h("input", { type: "range", min: 30, max: 600, step: 10, value: S.settings.mbPerTab, "aria-label": "Geschätzter RAM je Tab", "data-key": "mb" });
-  const out = h("output", { text: `${S.settings.mbPerTab} MB` });
-  range.addEventListener("input", () => (out.textContent = `${range.value} MB`));
-  range.addEventListener("change", () => setSetting({ mbPerTab: Number(range.value) }));
 
   put($("view-settings"),
     h("section", { class: "setting" },
@@ -790,8 +793,6 @@ function renderSettings() {
     h("section", { class: "setting" },
       h("h2", { text: "Anzeige" }),
       toggle("badge", "Zahl der entladenen Tabs am Symbol zeigen"),
-      h("p", { text: "Geschätzter Arbeitsspeicher je entladenem Tab, für die Statistik:" }),
-      h("div", { class: "range" }, range, out),
     ),
     h("section", { class: "setting about" },
       `Siesta ${browser.runtime.getManifest().version}. Auch per Rechtsklick auf einen Tab erreichbar. Ton, laufende Freigaben und der gerade offene Tab werden nie entladen.`,

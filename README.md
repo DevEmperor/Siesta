@@ -16,8 +16,9 @@ Alles wird im Popup oben rechts bedient. Eine eigene Einstellungsseite gibt es n
   z. B. `teams.microsoft.com`.
 - **Standard**: Optionale Zeit für alle übrigen Tabs (ab Werk: nie).
 - **Rangfolge**: eigene Tab-Regel vor Website-Regel vor Standard.
-- **Live-Übersicht**: Welche Tabs geladen und welche entladen sind, mit Countdown.
-  Das Mond-Symbol nimmt ab, je näher das Entladen rückt.
+- **Live-Übersicht**: Welche Tabs geladen und welche entladen sind, mit Countdown
+  und dem Tab, der als Nächstes entladen wird. Das Mond-Symbol nimmt ab, je
+  näher das Entladen rückt.
 - **Von Hand entladen**: einzelne Tabs, den aktuellen Tab (Firefox wechselt dann
   zum zuletzt genutzten Tab) oder alle inaktiven Tabs auf einmal.
 - **Schutz**: Tabs mit Ton, mit Kamera-, Mikrofon- oder Bildschirmfreigabe und
@@ -38,9 +39,9 @@ Die Zeit läuft ab dem Moment, in dem du den Tab verlässt (Firefox führt das a
 
 ### Grenzen
 
-- Firefox gibt Add-ons keinen Speicherverbrauch einzelner Tabs preis. Die
-  RAM-Angabe ist deshalb eine **Schätzung** (Standard 120 MB je Tab, in den
-  Einstellungen anpassbar) und wird im Popup auch so bezeichnet.
+- Firefox gibt Add-ons keinen Speicherverbrauch einzelner Tabs preis. Siesta
+  zeigt deshalb bewusst keine RAM-Zahlen, sondern nur, welche Tabs geladen und
+  welche entladen sind.
 - Ungespeicherte Eingaben in Formularen stellt Firefox nach dem Neuladen meist
   wieder her, aber nicht auf jeder Seite.
 

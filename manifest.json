@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Siesta – Tabs automatisch entladen",
   "short_name": "Siesta",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Entlädt Tabs nach einer frei wählbaren Zeit ohne Nutzung, einzeln pro Tab oder pro Website. Übersicht, Einstellungen und Statistik direkt im Popup.",
   "author": "Jannis",
   "icons": {

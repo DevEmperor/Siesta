@@ -30,7 +30,8 @@ async function loadState() {
     browser.storage.local.get(["settings", "siteRules"]),
     browser.storage.session.get("lastLeft"),
   ]);
-  return { settings: { ...DEFAULT_SETTINGS, ...settings }, siteRules, lastLeft };
+  const known = Object.fromEntries(Object.entries(settings).filter(([k]) => k in DEFAULT_SETTINGS));
+  return { settings: { ...DEFAULT_SETTINGS, ...known }, siteRules, lastLeft };
 }
 
 function emptyStats() {
@@ -257,13 +258,13 @@ function setSiteRule(host, minutes) {
 function patchSettings(patch) {
   return locked(async () => {
     const { settings = {} } = await browser.storage.local.get("settings");
-    const next = { ...DEFAULT_SETTINGS, ...settings };
-    for (const [k, v] of Object.entries(patch)) {
-      if (!(k in DEFAULT_SETTINGS) || typeof v !== typeof DEFAULT_SETTINGS[k]) continue;
-      next[k] = v;
+    const next = { ...DEFAULT_SETTINGS };
+    for (const source of [settings, patch]) {
+      for (const [k, v] of Object.entries(source)) {
+        if (k in DEFAULT_SETTINGS && typeof v === typeof DEFAULT_SETTINGS[k]) next[k] = v;
+      }
     }
     next.defaultMinutes = clampMinutes(next.defaultMinutes) ?? 0;
-    next.mbPerTab = Math.min(2000, Math.max(10, Math.round(next.mbPerTab)));
     await browser.storage.local.set({ settings: next });
     return next;
   });
