@@ -1,0 +1,42 @@
+name: Bug report
+description: Something in Siesta doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did Siesta do instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the Siesta popup on a tab
+        2. Pick "5 min"
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: firefox
+    attributes:
+      label: Firefox version
+      description: Shown under Help → About Firefox
+      placeholder: "158.0.1"
+    validations:
+      required: true
+  - type: input
+    id: siesta
+    attributes:
+      label: Siesta version
+      description: Shown at the bottom of the popup's Settings view
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Windows 11, macOS 15, Ubuntu 24.04, …"

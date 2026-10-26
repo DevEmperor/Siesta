@@ -81,7 +81,7 @@ function recordUnload(tab, kind) {
     day[kind === "auto" ? 0 : 1] += 1;
     stats.days[key] = day;
     stats[kind] += 1;
-    const host = hostOf(tab.url) || "Sonstige";
+    const host = hostOf(tab.url) || "Other";
     stats.sites[host] = (stats.sites[host] || 0) + 1;
     stats.log.unshift({ t: now, kind, host, title: tab.title || host });
     stats.log.length = Math.min(stats.log.length, LOG_SIZE);
@@ -175,7 +175,7 @@ async function updateBadge(settings) {
   if (settings.paused) {
     await browser.action.setBadgeBackgroundColor({ color: "#6F6B9C" });
     await browser.action.setBadgeText({ text: "II" });
-    await browser.action.setTitle({ title: "Siesta: automatisches Entladen pausiert" });
+    await browser.action.setTitle({ title: "Siesta: auto-unload paused" });
     return;
   }
   await browser.action.setTitle({ title: "Siesta" });
@@ -308,15 +308,15 @@ browser.runtime.onMessage.addListener((msg, sender) => {
 
 const MENU_ROOT = "siesta";
 const MENU_VALUES = [
-  ["inherit", "Standard bzw. Website-Regel verwenden"],
-  ["0", "Nie entladen"],
-  ...PRESETS.map((m) => [String(m), `Nach ${formatMinutes(m)} entladen`]),
+  ["inherit", "Use default or site rule"],
+  ["0", "Never unload"],
+  ...PRESETS.map((m) => [String(m), `Unload after ${formatMinutes(m)}`]),
 ];
 
 async function setupMenus() {
   await browser.menus.removeAll();
   browser.menus.create({ id: MENU_ROOT, title: "Siesta", contexts: ["tab"] });
-  browser.menus.create({ id: "now", parentId: MENU_ROOT, title: "Jetzt entladen", contexts: ["tab"] });
+  browser.menus.create({ id: "now", parentId: MENU_ROOT, title: "Unload now", contexts: ["tab"] });
   browser.menus.create({ id: "sep", parentId: MENU_ROOT, type: "separator", contexts: ["tab"] });
   for (const [value, title] of MENU_VALUES) {
     browser.menus.create({

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="color-scheme" content="light dark" />
@@ -16,37 +16,37 @@
         <span>Siesta</span>
       </div>
       <label class="auto">
-        <span id="auto-label">Automatik</span>
+        <span id="auto-label">Auto-unload</span>
         <input type="checkbox" id="auto" class="switch" role="switch" aria-labelledby="auto-label" />
       </label>
     </header>
 
-    <nav class="views" role="tablist" aria-label="Ansicht">
+    <nav class="views" role="tablist" aria-label="View">
       <button role="tab" id="tab-tabs" data-view="tabs" aria-controls="view-tabs" aria-selected="true">
         Tabs <span class="count" id="count-all"></span>
       </button>
       <button role="tab" id="tab-stats" data-view="stats" aria-controls="view-stats" aria-selected="false">
-        Statistik
+        Stats
       </button>
       <button role="tab" id="tab-settings" data-view="settings" aria-controls="view-settings" aria-selected="false">
-        Einstellungen
+        Settings
       </button>
     </nav>
 
     <main id="main">
       <section id="view-tabs" role="tabpanel" aria-labelledby="tab-tabs">
         <div id="paused-note"></div>
-        <section class="now" id="now" aria-label="Aktueller Tab"></section>
+        <section class="now" id="now" aria-label="Current tab"></section>
         <div class="split" id="split"></div>
         <div class="tools">
           <label class="search">
             <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.3-4.3" /></svg>
-            <input type="search" id="search" placeholder="Suchen" aria-label="Tabs durchsuchen" autocomplete="off" />
+            <input type="search" id="search" placeholder="Search" aria-label="Search tabs" autocomplete="off" />
           </label>
           <div class="filter" id="filter" role="group" aria-label="Filter">
-            <button data-filter="all" aria-pressed="true">Alle</button>
-            <button data-filter="awake" aria-pressed="false">Geladen</button>
-            <button data-filter="asleep" aria-pressed="false">Entladen</button>
+            <button data-filter="all" aria-pressed="true">All</button>
+            <button data-filter="awake" aria-pressed="false">Loaded</button>
+            <button data-filter="asleep" aria-pressed="false">Unloaded</button>
           </div>
         </div>
         <div id="list"></div>

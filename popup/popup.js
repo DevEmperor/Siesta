@@ -6,7 +6,6 @@ import {
   formatAgo,
   formatClock,
   formatMinutes,
-  formatSpan,
 } from "../lib/core.js";
 
 const send = (type, data = {}) => browser.runtime.sendMessage({ type, ...data });
@@ -15,6 +14,7 @@ const $ = (id) => document.getElementById(id);
 let S = null; // last state snapshot from the background script
 let clockSkew = 0; // background "now" minus popup "now"
 let currentTabId = null;
+let ownTabId = null; // set when this page is open in a normal tab instead of the popup
 const ui = {
   view: "tabs",
   filter: "all",
@@ -140,7 +140,8 @@ const now = () => Date.now() + clockSkew;
 async function refresh() {
   const state = await send("getState");
   clockSkew = state.now - Date.now();
-  S = state;
+  // The page never lists itself when it is opened in a tab.
+  S = { ...state, tabs: state.tabs.filter((t) => t.id !== ownTabId) };
   render();
 }
 
@@ -153,17 +154,11 @@ function refreshSoon(delay = 120) {
 const tabById = (id) => S.tabs.find((t) => t.id === id);
 
 function describeRule(rule) {
-  const when = rule.minutes > 0 ? `nach ${formatMinutes(rule.minutes)} ohne Nutzung` : null;
-  if (rule.source === "tab") {
-    return when ? ["Eigene Regel: wird ", h("strong", { text: when }), " entladen."] : ["Eigene Regel: wird ", h("strong", { text: "nie" }), " automatisch entladen."];
-  }
-  if (rule.source === "site") {
-    const who = `Regel für ${rule.host}: `;
-    return when ? [who, "wird ", h("strong", { text: when }), " entladen."] : [who, "wird ", h("strong", { text: "nie" }), " automatisch entladen."];
-  }
-  return when
-    ? ["Standard: wird ", h("strong", { text: when }), " entladen."]
-    : ["Standard: kein automatisches Entladen. Wähle eine Zeit für diesen Tab oder die Website."];
+  const when = rule.minutes > 0 ? `after ${formatMinutes(rule.minutes)} without use` : null;
+  const who = rule.source === "tab" ? "Own rule" : rule.source === "site" ? `Rule for ${rule.host}` : "Default";
+  if (when) return [`${who}: unloads `, h("strong", { text: when }), "."];
+  if (rule.source === "default") return ["Default: no automatic unloading. Pick a time for this tab or the whole site."];
+  return [`${who}: `, h("strong", { text: "never" }), " unloaded automatically."];
 }
 
 function stateLine(tab) {
@@ -171,25 +166,25 @@ function stateLine(tab) {
   switch (st.state) {
     case "active":
       return st.rule.minutes > 0
-        ? ["Du bist gerade hier. Der Countdown startet, sobald du den Tab verlässt."]
-        : ["Du bist gerade hier."];
+        ? ["You're on this tab. The countdown starts when you leave it."]
+        : ["You're on this tab."];
     case "counting":
-      return ["Wird in ", h("strong", { class: "clock-text", "data-due": st.due, text: formatClock(st.due - now()) }), " entladen."];
+      return ["Unloads in ", h("strong", { class: "clock-text", "data-due": st.due, text: formatClock(st.due - now()) }), "."];
     case "asleep":
-      return ["Dieser Tab ist entladen und lädt neu, sobald du ihn öffnest."];
+      return ["This tab is unloaded and reloads when you open it."];
     case "protected":
       return [protectText(st.reason)];
     case "paused":
-      return ["Die Automatik ist pausiert."];
+      return ["Auto-unload is paused."];
     default:
       return [];
   }
 }
 
 function protectText(reason) {
-  if (reason === "audio") return "Spielt gerade Ton und bleibt deshalb geladen.";
-  if (reason === "sharing") return "Nutzt Kamera, Mikrofon oder Bildschirmfreigabe und bleibt geladen.";
-  return "Angepinnt: wird nur mit eigener Regel oder Website-Regel entladen.";
+  if (reason === "audio") return "Playing audio, so it stays loaded.";
+  if (reason === "sharing") return "Sharing camera, microphone or screen, so it stays loaded.";
+  return "Pinned: only unloaded with its own rule or a site rule.";
 }
 
 // ---------------------------------------------------------------- timer picker
@@ -235,14 +230,14 @@ function picker(tab, key) {
       onclick: extra.onclick || (() => apply(minutes)),
     }, label);
 
-  const chips = h("div", { class: "chips", role: "group", "aria-label": "Entladen nach" },
-    chip(null, "Standard", current == null, {
+  const chips = h("div", { class: "chips", role: "group", "aria-label": "Unload after" },
+    chip(null, "Default", current == null, {
       class: "quiet",
-      title: scope === "tab" ? "Website-Regel bzw. Standard verwenden" : "Website-Regel entfernen",
+      title: scope === "tab" ? "Use the site rule or the default" : "Remove the site rule",
     }),
-    chip(0, "Nie", current === 0),
+    chip(0, "Never", current === 0),
     PRESETS.map((m) => chip(m, chipLabel(m), current === m)),
-    chip(null, isCustom ? chipLabel(current) : "Eigene", isCustom || customOpen, {
+    chip(null, isCustom ? chipLabel(current) : "Custom", isCustom || customOpen, {
       onclick: () => {
         ui.custom[key] = !customOpen;
         render();
@@ -261,13 +256,13 @@ function picker(tab, key) {
       step: 1,
       value: isCustom ? current : "",
       placeholder: "45",
-      "aria-label": "Minuten",
+      "aria-label": "Minutes",
       "data-key": `${key}-custom`,
     });
     const submit = () => {
       const n = Math.round(Number(input.value));
       if (!(n >= 1 && n <= MAX_MINUTES)) {
-        toast(`Bitte 1 bis ${MAX_MINUTES} Minuten eingeben`);
+        toast(`Enter 1 to ${MAX_MINUTES} minutes`);
         return;
       }
       apply(n);
@@ -275,22 +270,22 @@ function picker(tab, key) {
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") submit();
     });
-    custom = h("div", { class: "custom" }, input, h("span", { text: "Minuten" }),
-      h("button", { type: "button", class: "btn", onclick: submit, "data-key": `${key}-custom-ok` }, "Übernehmen"));
+    custom = h("div", { class: "custom" }, input, h("span", { text: "minutes" }),
+      h("button", { type: "button", class: "btn", onclick: submit, "data-key": `${key}-custom-ok` }, "Apply"));
   }
 
   const notes = [];
-  if (scope === "site") notes.push(` Website-Regeln gelten für alle Tabs von ${tab.host}.`);
+  if (scope === "site") notes.push(` Site rules apply to every tab from ${tab.host}.`);
   if (scope === "site" && tab.override != null) {
-    notes.push(" Die eigene Regel dieses Tabs hat Vorrang, bis du eine Website-Zeit wählst.");
+    notes.push(" This tab's own rule wins until you pick a time for the site.");
   }
 
   return h("div", { class: "picker" },
-    h("div", { class: "scope", role: "group", "aria-label": "Gilt für" },
-      scopeBtn("tab", "Nur dieser Tab"),
-      scopeBtn("site", "Ganze Website", {
+    h("div", { class: "scope", role: "group", "aria-label": "Applies to" },
+      scopeBtn("tab", "This tab only"),
+      scopeBtn("site", "Whole site", {
         disabled: !hasHost,
-        title: hasHost ? `Alle Tabs von ${tab.host}` : "Für diese Seite gibt es keine Website-Regel",
+        title: hasHost ? `Every tab from ${tab.host}` : "Site rules only work for web pages",
       }),
     ),
     chips,
@@ -303,9 +298,9 @@ function picker(tab, key) {
 
 async function unload(tab) {
   const res = await send("discard", { tabId: tab.id });
-  if (res?.ok) toast("Tab entladen");
-  else if (res?.reason === "only-tab") toast("Der einzige Tab im Fenster kann nicht entladen werden");
-  else toast("Firefox hat das Entladen abgelehnt");
+  if (res?.ok) toast("Tab unloaded");
+  else if (res?.reason === "only-tab") toast("The only tab in a window can't be unloaded");
+  else toast("Firefox refused to unload this tab");
   await refresh();
 }
 
@@ -342,8 +337,8 @@ function renderTabs() {
   const t = now();
   put($("paused-note"),
     S.settings.paused
-      ? h("div", { class: "note" }, "Die Automatik ist pausiert. Tabs werden nur noch von Hand entladen.",
-          h("button", { type: "button", class: "btn", onclick: () => setSetting({ paused: false }), "data-key": "resume" }, "Fortsetzen"))
+      ? h("div", { class: "note" }, "Auto-unload is paused. You can still unload tabs by hand.",
+          h("button", { type: "button", class: "btn", onclick: () => setSetting({ paused: false }), "data-key": "resume" }, "Resume"))
       : null,
   );
 
@@ -362,8 +357,8 @@ function renderTabs() {
         h("button", {
           type: "button",
           class: "icon-btn solid",
-          title: "Jetzt entladen",
-          "aria-label": "Diesen Tab jetzt entladen",
+          title: "Unload now",
+          "aria-label": "Unload this tab now",
           disabled: cur.discarded,
           "data-key": "now-unload",
           onclick: () => unload(cur),
@@ -385,8 +380,8 @@ function renderTabs() {
   if (!S.tabs.length) bar.append(h("span", { class: "none" }));
   put($("split"),
     h("div", { class: "split-legend" },
-      h("span", {}, h("b", { text: awake }), "geladen"),
-      h("span", {}, h("b", { text: asleep.length }), "entladen"),
+      h("span", {}, h("b", { text: awake }), "loaded"),
+      h("span", {}, h("b", { text: asleep.length }), "unloaded"),
     ),
     bar,
     h("div", { class: "split-actions" },
@@ -398,11 +393,11 @@ function renderTabs() {
         disabled: !S.tabs.some((x) => !x.discarded && !x.active),
         onclick: async () => {
           const res = await send("discardAll");
-          toast(res.count ? `${res.count} Tabs entladen` : "Keine weiteren Tabs zum Entladen");
+          toast(res.count ? `${res.count} ${res.count === 1 ? "tab" : "tabs"} unloaded` : "No other tabs to unload");
           await refresh();
         },
-        title: "Alle Tabs außer den gerade offenen entladen",
-      }, icon("sleep"), "Inaktive entladen"),
+        title: "Unload every tab except the one open in each window",
+      }, icon("sleep"), "Unload inactive"),
     ),
   );
 
@@ -434,11 +429,11 @@ function renderTabs() {
   const list = $("list");
   list.replaceChildren();
   if (!visible.length) {
-    list.append(h("p", { class: "empty", text: q ? "Kein Tab passt zur Suche." : ui.filter === "asleep" ? "Gerade ist kein Tab entladen." : "Keine Tabs." }));
+    list.append(h("p", { class: "empty", text: q ? "No tab matches your search." : ui.filter === "asleep" ? "No tabs are unloaded right now." : "No tabs." }));
     return;
   }
-  if (loaded.length) list.append(group("Geladen", loaded, t));
-  if (unloaded.length) list.append(group("Entladen", unloaded, t));
+  if (loaded.length) list.append(group("Loaded", loaded, t));
+  if (unloaded.length) list.append(group("Unloaded", unloaded, t));
 }
 
 // The tab whose timer runs out first, with a live countdown.
@@ -446,10 +441,10 @@ function nextUnload() {
   const next = S.tabs
     .filter((x) => x.status.state === "counting")
     .sort((a, b) => a.status.due - b.status.due)[0];
-  if (!next) return h("p", { text: "Gerade läuft kein Timer" });
+  if (!next) return h("p", { text: "No timer running" });
   const label = next.title || next.url;
   return h("p", { title: label },
-    "Als Nächstes in ",
+    "Next in ",
     h("span", { class: "clock-text", "data-due": next.status.due, text: formatClock(next.status.due - now()) }),
     ": ", label);
 }
@@ -467,20 +462,20 @@ function metaFor(tab, t) {
     return h("span", { class: "clock", "data-due": st.due, text: formatClock(st.due - t) });
   }
   const words = {
-    active: "aktiv",
-    untimed: "kein Timer",
-    paused: "pausiert",
-    protected: { audio: "Ton läuft", sharing: "Freigabe", pinned: "angepinnt" }[st.reason],
-    asleep: tab.sleptAt ? `seit ${formatSpan(t - tab.sleptAt)}` : "entladen",
+    active: "active",
+    untimed: "no timer",
+    paused: "paused",
+    protected: { audio: "playing", sharing: "sharing", pinned: "pinned" }[st.reason],
+    asleep: tab.sleptAt ? formatAgo(t - tab.sleptAt) : "unloaded",
   };
   return h("span", { text: words[st.state] });
 }
 
 function rulePill(rule) {
   if (rule.source === "default") {
-    return rule.minutes > 0 ? h("span", { class: "pill default", title: "Standardzeit", text: chipLabel(rule.minutes) }) : null;
+    return rule.minutes > 0 ? h("span", { class: "pill default", title: "Default time", text: chipLabel(rule.minutes) }) : null;
   }
-  const title = rule.source === "tab" ? "Eigene Regel dieses Tabs" : `Regel für ${rule.host}`;
+  const title = rule.source === "tab" ? "This tab's own rule" : `Rule for ${rule.host}`;
   return h("span", { class: `pill ${rule.source}`, title, text: chipLabel(rule.minutes) });
 }
 
@@ -512,16 +507,16 @@ function row(tab, t) {
           : h("button", {
               type: "button",
               class: "icon-btn quick",
-              title: "Jetzt entladen",
-              "aria-label": `${label} jetzt entladen`,
+              title: "Unload now",
+              "aria-label": `Unload ${label} now`,
               "data-key": `unload-${tab.id}`,
               onclick: () => unload(tab),
             }, icon("sleep")),
         h("button", {
           type: "button",
           class: "icon-btn",
-          title: "Timer einstellen",
-          "aria-label": `Timer für ${label} einstellen`,
+          title: "Set timer",
+          "aria-label": `Set timer for ${label}`,
           "aria-expanded": String(open),
           "data-key": `edit-${tab.id}`,
           onclick: () => {
@@ -536,10 +531,10 @@ function row(tab, t) {
     li.append(h("div", { class: "editor" },
       picker(tab, `row${tab.id}`),
       h("div", { class: "editor-actions" },
-        h("button", { type: "button", class: "btn", onclick: () => focusTab(tab), "data-key": `go-${tab.id}` }, icon("switchTo"), "Zum Tab"),
+        h("button", { type: "button", class: "btn", onclick: () => focusTab(tab), "data-key": `go-${tab.id}` }, icon("switchTo"), "Go to tab"),
         tab.discarded
           ? null
-          : h("button", { type: "button", class: "btn primary", onclick: () => unload(tab), "data-key": `unload2-${tab.id}` }, icon("sleep"), "Jetzt entladen"),
+          : h("button", { type: "button", class: "btn primary", onclick: () => unload(tab), "data-key": `unload2-${tab.id}` }, icon("sleep"), "Unload now"),
       ),
     ));
   }
@@ -548,7 +543,7 @@ function row(tab, t) {
 
 // ---------------------------------------------------------------- statistics
 
-const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function renderStats() {
   const st = S.stats;
@@ -559,15 +554,15 @@ function renderStats() {
   for (let i = 6; i >= 0; i--) {
     const ts = t - i * 86400000;
     const [auto = 0, manual = 0] = st.days[dayKey(ts)] || [];
-    days.push({ ts, auto, manual, label: i === 0 ? "Heute" : WEEKDAYS[new Date(ts).getDay()] });
+    days.push({ ts, auto, manual, label: i === 0 ? "Today" : WEEKDAYS[new Date(ts).getDay()] });
   }
   const week = days.reduce((a, d) => a + d.auto + d.manual, 0);
   const today = days[6].auto + days[6].manual;
   const max = Math.max(1, ...days.map((d) => d.auto + d.manual));
 
   const lead = asleep
-    ? h("p", { class: "lead", text: `${asleep} von ${S.tabs.length} Tabs ${asleep === 1 ? "ist" : "sind"} gerade entladen.` })
-    : h("p", { class: "lead", text: "Gerade ist kein Tab entladen." });
+    ? h("p", { class: "lead", text: `${asleep} of ${S.tabs.length} tabs ${asleep === 1 ? "is" : "are"} unloaded right now.` })
+    : h("p", { class: "lead", text: "No tabs are unloaded right now." });
 
   const tip = h("div", { class: "tip", hidden: true });
   const bars = h("div", { class: "bars" },
@@ -576,7 +571,7 @@ function renderStats() {
       const bar = h("div", {
         class: "bar",
         tabindex: 0,
-        "aria-label": `${d.label}: ${sum} entladen, davon ${d.auto} automatisch und ${d.manual} von Hand`,
+        "aria-label": `${d.label}: ${sum} unloaded, ${d.auto} automatically and ${d.manual} by hand`,
       },
         d.auto ? h("span", { class: `seg auto${d.manual ? "" : " top"}`, style: `height:${(d.auto / max) * 86}%` }) : null,
         d.manual ? h("span", { class: "seg manual top", style: `height:${(d.manual / max) * 86}%` }) : null,
@@ -585,8 +580,8 @@ function renderStats() {
       const show = () => {
         const box = bar.getBoundingClientRect();
         const host = bars.parentElement.getBoundingClientRect();
-        tip.replaceChildren(h("strong", { text: d.label === "Heute" ? "Heute" : new Date(d.ts).toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "short" }) }),
-          h("br"), `${d.auto} automatisch`, h("br"), `${d.manual} von Hand`);
+        tip.replaceChildren(h("strong", { text: d.label === "Today" ? "Today" : new Date(d.ts).toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "short" }) }),
+          h("br"), `${d.auto} automatic`, h("br"), `${d.manual} by hand`);
         tip.style.left = `${box.left - host.left + box.width / 2}px`;
         tip.style.top = `${box.top - host.top + 6}px`;
         tip.hidden = false;
@@ -605,36 +600,36 @@ function renderStats() {
 
   put($("view-stats"),
     lead,
-    h("h2", { text: "Entladungen der letzten 7 Tage" }),
+    h("h2", { text: "Unloads in the last 7 days" }),
     h("div", { class: "chart" },
       h("div", { class: "chart-legend" },
-        h("span", { style: "--c: var(--chart-auto)", text: "automatisch" }),
-        h("span", { style: "--c: var(--chart-manual)", text: "von Hand" }),
+        h("span", { style: "--c: var(--chart-auto)", text: "automatic" }),
+        h("span", { style: "--c: var(--chart-manual)", text: "by hand" }),
       ),
       bars,
       h("div", { class: "bar-labels" }, days.map((d, i) => h("span", { class: i === 6 ? "today" : null, text: d.label }))),
       tip,
     ),
     h("dl", { class: "facts" },
-      h("div", {}, h("dt", { text: "heute" }), h("dd", { text: today })),
-      h("div", {}, h("dt", { text: "in 7 Tagen" }), h("dd", { text: week })),
-      h("div", {}, h("dt", { text: `insgesamt seit ${new Date(st.since).toLocaleDateString("de-DE", { day: "numeric", month: "short" })}` }), h("dd", { text: total })),
-      h("div", {}, h("dt", { text: "später wieder geöffnet" }), h("dd", { text: `${restoredShare} %` })),
+      h("div", {}, h("dt", { text: "today" }), h("dd", { text: today })),
+      h("div", {}, h("dt", { text: "last 7 days" }), h("dd", { text: week })),
+      h("div", {}, h("dt", { text: `total since ${new Date(st.since).toLocaleDateString("en-US", { day: "numeric", month: "short" })}` }), h("dd", { text: total })),
+      h("div", {}, h("dt", { text: "reopened later" }), h("dd", { text: `${restoredShare}%` })),
     ),
-    h("h2", { text: "Am häufigsten entladen" }),
+    h("h2", { text: "Unloaded most often" }),
     sites.length
       ? h("ul", { class: "sites" }, sites.map(([host, n]) =>
           h("li", {}, h("span", { text: host }), h("span", { class: "n", text: n }),
             h("span", { class: "track" }, h("span", { style: `width:${(n / topN) * 100}%` })))))
-      : h("p", { class: "empty", text: "Sobald Tabs entladen werden, siehst du hier die Websites." }),
-    h("h2", { text: "Zuletzt entladen" }),
+      : h("p", { class: "empty", text: "Sites show up here once tabs get unloaded." }),
+    h("h2", { text: "Recently unloaded" }),
     st.log.length
       ? h("ul", { class: "log" }, st.log.slice(0, 12).map((e) =>
           h("li", {},
             h("span", { class: "t", text: e.title }),
             h("span", { class: "when", text: formatAgo(t - e.t) }),
-            h("span", { class: "how", text: `${e.host}, ${e.kind === "auto" ? "automatisch" : "von Hand"}` }))))
-      : h("p", { class: "empty", text: "Noch keine Einträge." }),
+            h("span", { class: "how", text: `${e.host}, ${e.kind === "auto" ? "automatic" : "by hand"}` }))))
+      : h("p", { class: "empty", text: "Nothing yet." }),
     h("div", { class: "reset" },
       h("button", {
         type: "button",
@@ -654,10 +649,10 @@ function renderStats() {
           }
           ui.confirmReset = false;
           await send("resetStats");
-          toast("Statistik zurückgesetzt");
+          toast("Stats reset");
           await refresh();
         },
-      }, ui.confirmReset ? "Wirklich zurücksetzen?" : "Statistik zurücksetzen"),
+      }, ui.confirmReset ? "Really reset?" : "Reset stats"),
     ),
   );
 }
@@ -701,17 +696,17 @@ function defaultPicker() {
         setSetting({ defaultMinutes: minutes });
       },
     }, label);
-  const input = h("input", { type: "number", min: 1, max: MAX_MINUTES, value: isCustom ? current : "", placeholder: "45", "aria-label": "Minuten", "data-key": "def-custom", id: "def-custom" });
+  const input = h("input", { type: "number", min: 1, max: MAX_MINUTES, value: isCustom ? current : "", placeholder: "45", "aria-label": "Minutes", "data-key": "def-custom", id: "def-custom" });
   const submit = () => {
     const n = Math.round(Number(input.value));
-    if (!(n >= 1 && n <= MAX_MINUTES)) return toast(`Bitte 1 bis ${MAX_MINUTES} Minuten eingeben`);
+    if (!(n >= 1 && n <= MAX_MINUTES)) return toast(`Enter 1 to ${MAX_MINUTES} minutes`);
     ui.custom.default = false;
     setSetting({ defaultMinutes: n });
   };
   input.addEventListener("keydown", (e) => e.key === "Enter" && submit());
   return h("div", {},
     h("div", { class: "chips" },
-      chip(0, "Nie"),
+      chip(0, "Never"),
       PRESETS.map((m) => chip(m, chipLabel(m))),
       h("button", {
         type: "button",
@@ -723,9 +718,9 @@ function defaultPicker() {
           render();
           $("def-custom")?.focus();
         },
-      }, isCustom ? chipLabel(current) : "Eigene"),
+      }, isCustom ? chipLabel(current) : "Custom"),
     ),
-    open ? h("div", { class: "custom" }, input, h("span", { text: "Minuten" }), h("button", { type: "button", class: "btn", onclick: submit }, "Übernehmen")) : null,
+    open ? h("div", { class: "custom" }, input, h("span", { text: "minutes" }), h("button", { type: "button", class: "btn", onclick: submit }, "Apply")) : null,
   );
 }
 
@@ -734,17 +729,17 @@ function minutesSelect(value, onchange, label) {
   if (!values.includes(value)) values.push(value);
   values.sort((a, b) => a - b);
   return h("select", { "aria-label": label, onchange: (e) => onchange(Number(e.target.value)) },
-    values.map((m) => h("option", { value: m, selected: m === value }, m > 0 ? `nach ${formatMinutes(m)}` : "nie")));
+    values.map((m) => h("option", { value: m, selected: m === value }, m > 0 ? `after ${formatMinutes(m)}` : "never")));
 }
 
 function renderSettings() {
   const rules = Object.entries(S.siteRules).sort((a, b) => a[0].localeCompare(b[0]));
-  const hostInput = h("input", { type: "text", placeholder: "z. B. teams.microsoft.com", "aria-label": "Website", "data-key": "rule-host", spellcheck: "false" });
+  const hostInput = h("input", { type: "text", placeholder: "e.g. teams.microsoft.com", "aria-label": "Site", "data-key": "rule-host", spellcheck: "false" });
   let newMinutes = 10;
   const addRule = async () => {
     const res = await send("setSiteRule", { host: hostInput.value, minutes: newMinutes });
-    if (!res.ok) return toast("Das ist keine gültige Website-Adresse");
-    toast(`Regel für ${res.host} gespeichert`);
+    if (!res.ok) return toast("That's not a valid site address");
+    toast(`Rule for ${res.host} saved`);
     await refresh();
   };
   hostInput.addEventListener("keydown", (e) => e.key === "Enter" && addRule());
@@ -752,13 +747,13 @@ function renderSettings() {
 
   put($("view-settings"),
     h("section", { class: "setting" },
-      h("h2", { text: "Standard für alle übrigen Tabs" }),
-      h("p", { text: "Gilt für Tabs ohne eigene Regel und ohne Website-Regel." }),
+      h("h2", { text: "Default for all other tabs" }),
+      h("p", { text: "Applies to tabs without their own rule or a site rule." }),
       defaultPicker(),
     ),
     h("section", { class: "setting" },
-      h("h2", { text: "Website-Regeln" }),
-      h("p", { text: "Gelten für alle Tabs einer Website, auch nach einem Neustart." }),
+      h("h2", { text: "Site rules" }),
+      h("p", { text: "Apply to every tab of a site, also after a restart." }),
       rules.length
         ? h("ul", { class: "rules" }, rules.map(([host, m]) =>
             h("li", {},
@@ -766,12 +761,12 @@ function renderSettings() {
               minutesSelect(m, async (v) => {
                 await send("setSiteRule", { host, minutes: v });
                 await refresh();
-              }, `Zeit für ${host}`),
+              }, `Time for ${host}`),
               h("button", {
                 type: "button",
                 class: "icon-btn",
-                title: "Regel entfernen",
-                "aria-label": `Regel für ${host} entfernen`,
+                title: "Remove rule",
+                "aria-label": `Remove rule for ${host}`,
                 onclick: async () => {
                   await send("setSiteRule", { host, minutes: null });
                   await refresh();
@@ -780,22 +775,24 @@ function renderSettings() {
         : null,
       h("div", { class: "add-rule" },
         hostInput,
-        minutesSelect(newMinutes, (v) => (newMinutes = v), "Zeit für neue Regel"),
-        h("button", { type: "button", class: "icon-btn", title: "Regel hinzufügen", "aria-label": "Regel hinzufügen", onclick: addRule }, icon("plus")),
+        minutesSelect(newMinutes, (v) => (newMinutes = v), "Time for the new rule"),
+        h("button", { type: "button", class: "icon-btn", title: "Add rule", "aria-label": "Add rule", onclick: addRule }, icon("plus")),
       ),
     ),
     h("section", { class: "setting" },
-      h("h2", { text: "Nicht entladen, wenn …" }),
-      toggle("protectAudible", "… ein Tab Ton abspielt", "Musik, Videos und Anrufe laufen weiter."),
-      toggle("protectSharing", "… Kamera, Mikrofon oder Bildschirm geteilt werden"),
-      toggle("protectPinned", "… ein Tab angepinnt ist", "Gilt nur für den Standard; eigene und Website-Regeln greifen trotzdem."),
+      h("h2", { text: "Don't unload when …" }),
+      toggle("protectAudible", "… a tab is playing audio", "Music, videos and calls keep running."),
+      toggle("protectSharing", "… a tab shares your camera, microphone or screen"),
+      toggle("protectPinned", "… a tab is pinned", "Only affects the default time; a tab's own rule or a site rule still applies."),
     ),
     h("section", { class: "setting" },
-      h("h2", { text: "Anzeige" }),
-      toggle("badge", "Zahl der entladenen Tabs am Symbol zeigen"),
+      h("h2", { text: "Display" }),
+      toggle("badge", "Show the number of unloaded tabs on the toolbar icon"),
     ),
     h("section", { class: "setting about" },
-      `Siesta ${browser.runtime.getManifest().version}. Auch per Rechtsklick auf einen Tab erreichbar. Ton, laufende Freigaben und der gerade offene Tab werden nie entladen.`,
+      `Siesta ${browser.runtime.getManifest().version}. Also in the tab context menu: right-click any tab. `,
+      h("a", { href: "https://github.com/DevEmperor/Siesta", target: "_blank", rel: "noopener" }, "Source code and help on GitHub"),
+      ".",
     ),
   );
 }
@@ -844,6 +841,7 @@ function wire() {
 
 async function init() {
   // ?tab=<id> lets the popup page be opened in a normal tab for one specific tab.
+  ownTabId = (await browser.tabs.getCurrent())?.id ?? null;
   const forced = Number(new URLSearchParams(location.search).get("tab"));
   if (forced) {
     currentTabId = forced;
@@ -857,5 +855,5 @@ async function init() {
 
 init().catch((e) => {
   console.error(e);
-  document.body.append(h("p", { class: "empty", text: "Siesta konnte nicht geladen werden. Öffne das Popup bitte erneut." }));
+  document.body.append(h("p", { class: "empty", text: "Siesta couldn't load. Please open the popup again." }));
 });

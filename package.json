@@ -1,0 +1,20 @@
+{
+  "name": "siesta",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Firefox add-on that unloads idle tabs, with a timer per tab or per site.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "lint": "web-ext lint",
+    "test": "node --test tests/core.test.mjs",
+    "test:e2e": "node tests/e2e.mjs",
+    "start": "web-ext run",
+    "build": "sh scripts/build.sh",
+    "publish": "sh scripts/publish.sh"
+  },
+  "devDependencies": {
+    "puppeteer-core": "25.16.0",
+    "web-ext": "10.8.0"
+  }
+}

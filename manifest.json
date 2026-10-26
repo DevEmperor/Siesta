@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Siesta – Tabs automatisch entladen",
+  "name": "Siesta – Unload Idle Tabs",
   "short_name": "Siesta",
-  "version": "1.0.1",
-  "description": "Entlädt Tabs nach einer frei wählbaren Zeit ohne Nutzung, einzeln pro Tab oder pro Website. Übersicht, Einstellungen und Statistik direkt im Popup.",
-  "author": "Jannis",
+  "version": "1.1.0",
+  "description": "Unloads tabs you haven't used for a while, with a timer per tab or per site. Overview, settings and stats right in the popup.",
+  "author": "DevEmperor",
+  "homepage_url": "https://github.com/DevEmperor/Siesta",
   "icons": {
     "48": "icons/siesta.svg",
     "96": "icons/siesta.svg"
