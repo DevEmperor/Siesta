@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Siesta</title>
+    <link rel="stylesheet" href="popup.css" />
+    <script type="module" src="popup.js"></script>
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path class="lit" d="M20.5 14.6A8.6 8.6 0 1 1 9.4 3.5a7 7 0 0 0 11.1 11.1Z" />
+        </svg>
+        <span>Siesta</span>
+      </div>
+      <label class="auto">
+        <span id="auto-label">Automatik</span>
+        <input type="checkbox" id="auto" class="switch" role="switch" aria-labelledby="auto-label" />
+      </label>
+    </header>
+
+    <nav class="views" role="tablist" aria-label="Ansicht">
+      <button role="tab" id="tab-tabs" data-view="tabs" aria-controls="view-tabs" aria-selected="true">
+        Tabs <span class="count" id="count-all"></span>
+      </button>
+      <button role="tab" id="tab-stats" data-view="stats" aria-controls="view-stats" aria-selected="false">
+        Statistik
+      </button>
+      <button role="tab" id="tab-settings" data-view="settings" aria-controls="view-settings" aria-selected="false">
+        Einstellungen
+      </button>
+    </nav>
+
+    <main id="main">
+      <section id="view-tabs" role="tabpanel" aria-labelledby="tab-tabs">
+        <div id="paused-note"></div>
+        <section class="now" id="now" aria-label="Aktueller Tab"></section>
+        <div class="split" id="split"></div>
+        <div class="tools">
+          <label class="search">
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.3-4.3" /></svg>
+            <input type="search" id="search" placeholder="Suchen" aria-label="Tabs durchsuchen" autocomplete="off" />
+          </label>
+          <div class="filter" id="filter" role="group" aria-label="Filter">
+            <button data-filter="all" aria-pressed="true">Alle</button>
+            <button data-filter="awake" aria-pressed="false">Geladen</button>
+            <button data-filter="asleep" aria-pressed="false">Entladen</button>
+          </div>
+        </div>
+        <div id="list"></div>
+      </section>
+      <section id="view-stats" role="tabpanel" aria-labelledby="tab-stats" hidden></section>
+      <section id="view-settings" role="tabpanel" aria-labelledby="tab-settings" hidden></section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Siesta – Tabs automatisch entladen",
+  "short_name": "Siesta",
+  "version": "1.0.0",
+  "description": "Entlädt Tabs nach einer frei wählbaren Zeit ohne Nutzung, einzeln pro Tab oder pro Website. Übersicht, Einstellungen und Statistik direkt im Popup.",
+  "author": "Jannis",
+  "icons": {
+    "48": "icons/siesta.svg",
+    "96": "icons/siesta.svg"
+  },
+  "permissions": ["tabs", "storage", "alarms", "sessions", "menus"],
+  "background": {
+    "scripts": ["background.js"],
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Siesta",
+    "default_popup": "popup/popup.html",
+    "default_icon": "icons/toolbar-dark.svg",
+    "theme_icons": [
+      { "light": "icons/toolbar-light.svg", "dark": "icons/toolbar-dark.svg", "size": 16 },
+      { "light": "icons/toolbar-light.svg", "dark": "icons/toolbar-dark.svg", "size": 32 }
+    ]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "siesta@devemperor.net",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": { "required": ["none"] }
+    }
+  }
+}
